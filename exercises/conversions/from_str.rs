@@ -47,7 +47,10 @@ impl FromStr for Person {
             return Err(ParsePersonError::BadLen);
         }
         // let (name, age) = (values[0], values[1]);
-        let [name, age] = <[&str; 2]>::try_from(values).unwrap();
+        let (name, age) = match &values[..] {
+            [name, age] => (name, age),
+            _ => return Err(ParsePersonError::BadLen),
+        };
         if name.is_empty() {
             return Err(ParsePersonError::NoName);
         }

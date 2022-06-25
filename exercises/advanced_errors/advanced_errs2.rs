@@ -16,9 +16,7 @@
 // 4. Complete the partial implementation of `Display` for
 //    `ParseClimateError`.
 
-// I AM NOT DONE
-
-use std::error::Error;
+use std::error::{self, Error};
 use std::fmt::{self, Display, Formatter};
 use std::num::{ParseFloatError, ParseIntError};
 use std::str::FromStr;
@@ -46,12 +44,27 @@ impl From<ParseIntError> for ParseClimateError {
 // `ParseFloatError` values.
 impl From<ParseFloatError> for ParseClimateError {
     fn from(e: ParseFloatError) -> Self {
+        Self::ParseFloat(e)
         // TODO: Complete this function
     }
 }
 
 // TODO: Implement a missing trait so that `main()` below will compile. It
 // is not necessary to implement any methods inside the missing trait.
+
+// impl error::Error for ParseClimateError {} // when use this then test::test_downcast fails so must use next
+
+impl error::Error for ParseClimateError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        match self {
+            ParseClimateError::Empty => None,
+            ParseClimateError::BadLen => None,
+            ParseClimateError::NoCity => None,
+            ParseClimateError::ParseInt(e) => Some(e),
+            ParseClimateError::ParseFloat(e) => Some(e),
+        }
+    }
+}
 
 // The `Display` trait allows for other code to obtain the error formatted
 // as a user-visible string.
@@ -64,6 +77,9 @@ impl Display for ParseClimateError {
         match self {
             NoCity => write!(f, "no city name"),
             ParseFloat(e) => write!(f, "error parsing temperature: {}", e),
+            Empty => write!(f, "empty input"),
+            BadLen => write!(f, "incorrect number of fields"),
+            ParseInt(e) => write!(f, "error parsing year: {}", e),
         }
     }
 }
@@ -88,11 +104,17 @@ impl FromStr for Climate {
     // TODO: Complete this function by making it handle the missing error
     // cases.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.is_empty() {
+            return Err(ParseClimateError::Empty);
+        }
         let v: Vec<_> = s.split(',').collect();
         let (city, year, temp) = match &v[..] {
             [city, year, temp] => (city.to_string(), year, temp),
             _ => return Err(ParseClimateError::BadLen),
         };
+        if city.is_empty() {
+            return Err(ParseClimateError::NoCity);
+        }
         let year: u32 = year.parse()?;
         let temp: f32 = temp.parse()?;
         Ok(Climate { city, year, temp })
@@ -104,7 +126,10 @@ impl FromStr for Climate {
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("{:?}", "Hong Kong,1999,25.7".parse::<Climate>()?);
+    let res = "São Paulo,-21,28.5".parse::<Climate>()?;
+
     println!("{:?}", "".parse::<Climate>()?);
+
     Ok(())
 }
 
@@ -190,7 +215,6 @@ mod test {
         );
     }
     #[test]
-    #[ignore]
     fn test_downcast() {
         let res = "São Paulo,-21,28.5".parse::<Climate>();
         assert!(matches!(res, Err(ParseClimateError::ParseInt(_))));
